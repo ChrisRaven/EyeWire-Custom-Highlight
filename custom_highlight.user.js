@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1
+// @version      1.1
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -160,8 +160,7 @@ var CustomHighlight = function () {
     K.ls.set('custom-highlight-color-update-2018-01-09', true);
   }
 
-  let defaultSelectedIndex = K.ls.get('custom-highlight-index') || 1;
-
+  this.currentColorIndex = K.ls.get('custom-highlight-index') || 1;
   if (!K.gid('ews-settings-group')) {
     $('#settingsMenu').append(`
       <div id="ews-settings-group" class="settings-group ews-settings-group invisible">
@@ -183,11 +182,12 @@ var CustomHighlight = function () {
     }
   }
 
+  let ind = this.currentColorIndex;
   function colorSettingHTML(index) {
     return `
     <div id="ews-custom-highlight-color-label-` + index + `" style="display: block">
       <input type=radio name="ews-custom-highlight-color-radio-group" value=` + index +
-      (index == defaultSelectedIndex ? ' checked' : '') + `>
+      (index == ind ? ' checked' : '') + `>
       Highlight Color ` + index + `
       <div id="ews-custom-highlight-color-` + index + `" data-index=` + index + `></div>
     </div>`;
@@ -196,6 +196,31 @@ var CustomHighlight = function () {
   function bgColor(index) {
     K.gid('ews-custom-highlight-color-' + index).style.backgroundColor = K.ls.get('custom-highlight-color-' + index) || initialColors[index];
   }
+  
+  let checked = K.ls.get('settings-unhighlight-all') === 'true';
+  
+  $('#ews-settings-group').append(`
+    <div class="setting">
+      <span>Unhighlight all colors</span>
+      <div class="checkbox ` + (checked ? 'on' : 'off') + `">
+        <div class="checkbox-handle"></div>
+        <input type="checkbox" id="unhighlight-all-colors-option" style="display: none;"` + (checked ? ' checked' : '') + `>
+      </div>
+    </div>
+  `);
+  
+  $('#unhighlight-all-colors-option').closest('div.setting').click(function (evt) {
+    evt.stopPropagation();
+
+    let $elem = $(this).find('input');
+    let elem = $elem[0];
+    let newState = !elem.checked;
+
+    K.ls.set('settings-unhighlight-all', newState);
+    elem.checked = newState;
+
+    $elem.add($elem.closest('.checkbox')).removeClass(newState ? 'off' : 'on').addClass(newState ? 'on' : 'off');
+  });
 
   let starterColor;
   let openedIndex;
@@ -244,8 +269,6 @@ var CustomHighlight = function () {
     _this = this,
     currentCellId = '',
     highlightButton = document.querySelector('.control.highlight button');
-
-  this.currentColorIndex = 1; // 1|2|3
 
   $('body').append('<div id="ewsCustomHighlightedCells"><div id="ewsCustomHighlightedCellsWrapper"></div></div>');
 
@@ -417,23 +440,35 @@ var CustomHighlight = function () {
     var
       index, cubes,
       cubeId = this.getCurrentCubeId(),
-      cellId = this.getCurrentCellId();
-
-    if (direction && (direction.parents || direction.children)) {
-      this.removeRelatives(direction, cubeId);
-    }
-    else {
-      db.get(cellId + '-' + this.currentColorIndex, function (result) {
+      cellId = this.getCurrentCellId(),
+      unhighlightAll = K.ls.get('settings-unhighlight-all');
+      
+    let rem = function (cellId, suffix) {
+      db.get(cellId + (suffix ? '-' + suffix : ''), function (result) {
         if (result) {
           index = result.cubeIds.indexOf(cubeId);
           if (index > -1) {
             result.cubeIds.splice(index, 1);
             result.timestamp = Date.now();
             db.put(result);
-            _this.highlight(cellId, cubes);
+            _this.highlight(cellId, cubes, suffix);
           }
         }
       });
+    };
+
+    if (direction && (direction.parents || direction.children)) {
+      this.removeRelatives(direction, cubeId);
+    }
+    else {
+      if (unhighlightAll && unhighlightAll === 'true') {
+        rem(cellId, '1');
+        rem(cellId, '2');
+        rem(cellId, '3');
+      }
+      else {
+        rem(cellId, this.currentColorIndex);
+      }
     }
   };
 
@@ -441,12 +476,11 @@ var CustomHighlight = function () {
   this.removeRelatives = function (direction, self) {
     var
       dataToUse,
-      cellId = this.getCurrentCellId();
-
-    $.getJSON('/1.0/task/' + self + '/hierarchy', function (data) {
-      dataToUse = direction.parents ? data.ancestors : data.descendants;
-      dataToUse.push(self);
-      db.get(cellId + '-' + _this.currentColorIndex, function (result) {
+      cellId = this.getCurrentCellId(),
+      unhighlightAll = K.ls.get('settings-unhighlight-all');
+      
+    let rem = function (cellId, suffix) {
+      db.get(cellId + (suffix ? '-' + suffix : ''), function (result) {
         var cubes;
 
         if (result) {
@@ -455,9 +489,22 @@ var CustomHighlight = function () {
           result.cubeIds = cubes;
           result.timestamp = Date.now();
           db.put(result);
-          _this.highlight(cellId, cubes);
+          _this.highlight(cellId, cubes, suffix);
         }
       });
+    };
+
+    $.getJSON('/1.0/task/' + self + '/hierarchy', function (data) {
+      dataToUse = direction.parents ? data.ancestors : data.descendants;
+      dataToUse.push(self);
+      if (unhighlightAll && unhighlightAll === 'true') {
+        rem(cellId, '1');
+        rem(cellId, '2');
+        rem(cellId, '3');
+      }
+      else {
+        rem(cellId, _this.currentColorIndex);
+      }
     });
   };
 
