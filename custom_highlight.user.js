@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.1.1
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -444,14 +444,23 @@ var CustomHighlight = function () {
       unhighlightAll = K.ls.get('settings-unhighlight-all');
       
     let rem = function (cellId, suffix) {
-      db.get(cellId + (suffix ? '-' + suffix : ''), function (result) {
+      let cellName = cellId + (suffix ? '-' + suffix : '');
+
+      db.get(cellName, function (result) {
         if (result) {
           index = result.cubeIds.indexOf(cubeId);
           if (index > -1) {
             result.cubeIds.splice(index, 1);
-            result.timestamp = Date.now();
-            db.put(result);
-            _this.highlight(cellId, cubes, suffix);
+            if (!result.cubeIds.length) {
+              db.delete(cellName, function () {
+                _this.highlight(cellId, cubes, suffix);
+              });
+            }
+            else {
+              result.timestamp = Date.now();
+              db.put(result);
+              _this.highlight(cellId, cubes, suffix);
+            }
           }
         }
       });
@@ -480,16 +489,25 @@ var CustomHighlight = function () {
       unhighlightAll = K.ls.get('settings-unhighlight-all');
       
     let rem = function (cellId, suffix) {
-      db.get(cellId + (suffix ? '-' + suffix : ''), function (result) {
+      let cellName = cellId + (suffix ? '-' + suffix : '');
+
+      db.get(cellName, function (result) {
         var cubes;
 
         if (result) {
           // source: https://stackoverflow.com/a/33034768
           cubes = result.cubeIds.filter(x => dataToUse.indexOf(x) == -1);
           result.cubeIds = cubes;
-          result.timestamp = Date.now();
-          db.put(result);
-          _this.highlight(cellId, cubes, suffix);
+          if (!result.cubeIds.length) {
+            db.delete(cellName, function () {
+              _this.highlight(cellId, cubes, suffix);
+            });
+          }
+          else {
+            result.timestamp = Date.now();
+            db.put(result);
+            _this.highlight(cellId, cubes, suffix);
+          }
         }
       });
     };
