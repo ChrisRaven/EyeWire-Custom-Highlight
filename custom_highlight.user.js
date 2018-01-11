@@ -13,7 +13,7 @@
 /*jshint esversion: 6 */
 /*globals $, account, indexedDB, tomni, Keycodes */
 
-const LOCAL = false;
+var LOCAL = false;
 if (LOCAL) {
   console.log('%c--== TURN OFF "LOCAL" BEFORE RELEASING!!! ==--', "color: red; font-style: italic; font-weight: bold;");
 }
