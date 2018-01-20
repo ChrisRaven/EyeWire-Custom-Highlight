@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.1.2
+// @version      1.1.3
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -908,7 +908,7 @@ $.widget('ui.dialog', $.extend({}, $.ui.dialog.prototype, {
 var db, highlight;
 
 
-if (account.roles.scout || account.roles.scythe || account.roles.admin) {
+if (account.roles.scout || account.roles.scythe || account.roles.mystic || account.roles.admin) {
   db = new Database();
   highlight = new CustomHighlight();
 }
