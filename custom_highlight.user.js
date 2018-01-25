@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.1.3
+// @version      1.1.4
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -438,7 +438,7 @@ var CustomHighlight = function () {
 
   this.remove = function (direction) {
     var
-      index, cubes,
+      index,
       cubeId = this.getCurrentCubeId(),
       cellId = this.getCurrentCellId(),
       unhighlightAll = K.ls.get('settings-unhighlight-all');
@@ -453,13 +453,13 @@ var CustomHighlight = function () {
             result.cubeIds.splice(index, 1);
             if (!result.cubeIds.length) {
               db.delete(cellName, function () {
-                _this.highlight(cellId, cubes, suffix);
+                _this.highlight(cellId, result.cubeIds, suffix);
               });
             }
             else {
               result.timestamp = Date.now();
               db.put(result);
-              _this.highlight(cellId, cubes, suffix);
+              _this.highlight(cellId, result.cubeIds, suffix);
             }
           }
         }
