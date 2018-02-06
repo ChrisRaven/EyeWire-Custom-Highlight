@@ -204,9 +204,9 @@
 }
 
 #ews-current-color-indicator {
-    top: -22px;
+    top: 56px;
     left: 22px;
-    position: relative;
+    position: absolute;
     font-size: 10px;
     font-weight: bold;
 }
