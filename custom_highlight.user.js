@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.1.4
+// @version      1.2
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -160,7 +160,7 @@ var CustomHighlight = function () {
     K.ls.set('custom-highlight-color-update-2018-01-09', true);
   }
 
-  this.currentColorIndex = K.ls.get('custom-highlight-index') || 1;
+  this.currentColorIndex = +K.ls.get('custom-highlight-index') || 1;
   if (!K.gid('ews-settings-group')) {
     $('#settingsMenu').append(`
       <div id="ews-settings-group" class="settings-group ews-settings-group invisible">
@@ -170,6 +170,7 @@ var CustomHighlight = function () {
   }
 
   let initialColors = ['', '#FF0000', '#00FF00', '#0000FF'];
+
 
   function applyColor(color, index, inside = true) {
     var clr = inside ? color.toHexString() : color;
@@ -193,9 +194,13 @@ var CustomHighlight = function () {
     </div>`;
   }
 
-  function bgColor(index) {
-    K.gid('ews-custom-highlight-color-' + index).style.backgroundColor = K.ls.get('custom-highlight-color-' + index) || initialColors[index];
-  }
+  this.getColor = function (index) {
+    return  K.ls.get('custom-highlight-color-' + index) || initialColors[index];
+  };
+
+  this.bgColor = function (index) {
+    K.gid('ews-custom-highlight-color-' + index).style.backgroundColor = this.getColor(index);
+  };
   
   let checked = K.ls.get('settings-unhighlight-all') === 'true';
   
@@ -224,11 +229,11 @@ var CustomHighlight = function () {
 
   let starterColor;
   let openedIndex;
-  function initSpectrum(index) {
+  this.initSpectrum = function (index) {
     $('#ews-custom-highlight-color-' + index).spectrum({
       showInput: true,
       preferredFormat: 'hex',
-      color: K.ls.get('custom-highlight-color-' + index) || initialColors[index],
+      color: this.getColor(index),
       containerClassName: 'ews-color-picker',
       replacerClassName: 'ews-color-picker',
       show: function (color) {
@@ -254,16 +259,22 @@ var CustomHighlight = function () {
     colorSettingHTML(3)
   );
 
-  bgColor(1);
-  bgColor(2);
-  bgColor(3);
+  this.bgColor(1);
+  this.bgColor(2);
+  this.bgColor(3);
 
-  initSpectrum(1);
-  initSpectrum(2);
-  initSpectrum(3);
+  this.initSpectrum(1);
+  this.initSpectrum(2);
+  this.initSpectrum(3);
 
   $('.sp-cancel, .sp-choose').addClass('minimalButton');
+  
+  this.updateIndicator = function () {
+    let index = this.currentColorIndex;
 
+    K.gid('ews-current-color-indicator').innerHTML = index;
+    K.gid('ews-current-color-indicator').style.color = this.getColor(index);
+  };
 
   var
     _this = this,
@@ -293,6 +304,7 @@ var CustomHighlight = function () {
         <div class="down-arrow"></div>
       </div>
       <button class="cube translucent flat minimalButton active" title="Custom Highlight" disabled="">V</button>
+      <div id="ews-current-color-indicator">1</div>
       <div class="parents translucent flat active" title="Custom Highlight Parents (v + down)">
         <div class="up-arrow"></div>
       </div>
@@ -309,13 +321,10 @@ var CustomHighlight = function () {
     </div>
   `);
 
+  this.updateIndicator(); // initial setting of the indicator
 
   highlightButton.classList.add('active');
 
-
-  function getColor(index) {
-    return  K.ls.get('custom-highlight-color-' + index) || initialColors[index];
-  }
 
   this.highlight = function (cellId, cubeIds, index = this.currentColorIndex) {
     // zindex = 1, because the higlights object is processed using .forEach(), where the order of the indices
@@ -326,7 +335,7 @@ var CustomHighlight = function () {
     // and the order in the highlights object won't change
     tomni.getCurrentCell().highlight({
       cubeids: cubeIds,
-      color: getColor(index),
+      color: this.getColor(index),
       zindex: index
     });
     tomni.getCurrentCell().update();
@@ -630,9 +639,9 @@ var CustomHighlight = function () {
                 data-dataset-id="` + row.dataset + `"
               >
                 <td>` +
-                (row.cubes[1] ? (`<span style="color: ` + getColor(1) + `;">` + row.cubes[1]) + ` </span>` : '') +
-                (row.cubes[2] ? (`<span style="color: ` + getColor(2) + `;">` + row.cubes[2]) + ` </span>` : '') +
-                (row.cubes[3] ? (`<span style="color: ` + getColor(3) + `;">` + row.cubes[3]) + ` </span>` : '') +
+                (row.cubes[1] ? (`<span style="color: ` + _this.getColor(1) + `;">` + row.cubes[1]) + ` </span>` : '') +
+                (row.cubes[2] ? (`<span style="color: ` + _this.getColor(2) + `;">` + row.cubes[2]) + ` </span>` : '') +
+                (row.cubes[3] ? (`<span style="color: ` + _this.getColor(3) + `;">` + row.cubes[3]) + ` </span>` : '') +
                 `</td>
                 <td class="custom-highlighted-cell-name">` + row.name + `</td>
                 <td>` + row.cellId + `</td>
@@ -731,8 +740,11 @@ var CustomHighlight = function () {
   let doc = $(document);
 
   doc.on('change', 'input[name="ews-custom-highlight-color-radio-group"]', function() {
-    _this.currentColorIndex = this.value;
-    K.ls.set('custom-highlight-index', this.value);
+    let val = this.value;
+    _this.currentColorIndex = val;
+    K.ls.set('custom-highlight-index', val);
+    
+    _this.updateIndicator();
   });
 
   doc.on('cell-info-ready-triggered', function () {
@@ -875,6 +887,7 @@ var CustomHighlight = function () {
     });
 
     document.querySelector('.control.highlight button').disabled = false;
+    document.querySelector('.control.highlight button').title = 'Show list of cells with custom highlighted cubes';
 };
 // end: CUSTOM HIGHLIGHT
 
@@ -911,6 +924,21 @@ var db, highlight;
 if (account.roles.scout || account.roles.scythe || account.roles.mystic || account.roles.admin) {
   db = new Database();
   highlight = new CustomHighlight();
+  
+  $(document).keyup(function (evt) {
+    if (evt.which !== 84) {
+      return;
+    }
+
+    let index = highlight.currentColorIndex + 1;
+    if (index > 3) {
+      index = 1;
+    }
+    K.ls.set('custom-highlight-index', index);
+    highlight.currentColorIndex = index;
+    K.qS('#ews-custom-highlight-color-label-' + index + ' input').checked = true;
+    highlight.updateIndicator();
+  });
 }
 
 
