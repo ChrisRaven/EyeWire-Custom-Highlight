@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.2.1
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -689,13 +689,13 @@ var CustomHighlight = function () {
   K.injectJS(`
     $(window)
       .on(InspectorPanel.Events.ModelFetched, function () {
-        $(document).trigger('model-fetched-triggered');
+        $(document).trigger('model-fetched-triggered.custom-highlight');
       })
       .on('cell-info-ready', function (e, data) {
-        $(document).trigger('cell-info-ready-triggered', data);
+        $(document).trigger('cell-info-ready-triggered.custom-highlight', data);
       })
       .on('cube-leave', function (e, data) {
-        $(document).trigger('cube-leave-triggered', data);
+        $(document).trigger('cube-leave-triggered.custom-highlight', data);
       })
       .on('keyup.InspectorPanel.HotKeys', function (e) {
         e.type = 'hotkey-event-triggered';
@@ -747,15 +747,15 @@ var CustomHighlight = function () {
     _this.updateIndicator();
   });
 
-  doc.on('cell-info-ready-triggered', function () {
+  doc.on('cell-info-ready-triggered.custm-highlight', function () {
     _this.highlightCell();
   });
 
-  doc.on('cube-leave-triggered', function () {
+  doc.on('cube-leave-triggered.custom-highlight', function () {
     _this.refresh();
   });
 
-  doc.on('model-fetched-triggered', function () {
+  doc.on('model-fetched-triggered.custom-highlight', function () {
     if (tomni.getTarget()) {
       $('.custom-highlight button').css({
         'color': '#00CC00',
