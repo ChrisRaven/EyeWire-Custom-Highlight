@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.2.1
+// @version      1.2.2
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -747,7 +747,7 @@ var CustomHighlight = function () {
     _this.updateIndicator();
   });
 
-  doc.on('cell-info-ready-triggered.custm-highlight', function () {
+  doc.on('cell-info-ready-triggered.custom-highlight', function () {
     _this.highlightCell();
   });
 
