@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.2.3
+// @version      1.3
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -77,22 +77,95 @@ if (LOCAL) {
   };
 
 
-  var intv = setInterval(function () {
-    if (typeof account === 'undefined' || !account.account.uid) {
-      return;
+function Settings() {
+    let target;
+    
+    this.setTarget = function (selector) {
+      target = selector;
+    };
+    
+    this.getTarget = function () {
+      return target;
+    };
+    
+    this.addCategory = function (id = 'ews-custom-highlight-settings-group', name = 'Custom Highlight') {
+      if (!K.gid(id)) {
+        $('#settingsMenu').append(`
+          <div id="${id}" class="settings-group ews-settings-group invisible">
+            <h1>${name}</h1>
+          </div>
+        `);
+      }
+      
+      this.setTarget($('#' + id));
+    };
+
+    this.addOption = function (options) {
+      let settings = {
+        name: '',
+        id: '',
+        defaultState: false,
+        indented: false
+      }
+
+      $.extend(settings, options);
+      let storedState = K.ls.get(settings.id);
+      let state = storedState === null ? settings.defaultState : storedState.toLowerCase() === 'true';
+
+      target.append(`
+        <div class="setting" id="${settings.id}-wrapper">
+          <span>${settings.name}</span>
+          <div class="checkbox ${state ? 'on' : 'off'}">
+            <div class="checkbox-handle"></div>
+            <input type="checkbox" id="${settings.id}" style="display: none;" ${state ? ' checked' : ''}>
+          </div>
+        </div>
+      `);
+      
+      if (settings.indented) {
+        K.gid(settings.id).parentNode.parentNode.style.marginLeft = '30px';
+      }
+      
+      $(`#${settings.id}-wrapper`).click(function (evt) {
+        evt.stopPropagation();
+
+        let $elem = $(this).find('input');
+        let elem = $elem[0];
+        let newState = !elem.checked;
+
+        K.ls.set(settings.id, newState);
+        elem.checked = newState;
+
+        $elem.add($elem.closest('.checkbox')).removeClass(newState ? 'off' : 'on').addClass(newState ? 'on' : 'off');
+        $(document).trigger('ews-setting-changed', {setting: settings.id, state: newState});
+      });
+      
+      $(document).trigger('ews-setting-changed', {setting: settings.id, state: state});
+    };
+    
+    this.getValue = function (optionId) {
+      let val = K.ls.get(optionId);
+      
+      if (val === null) {
+        return undefined;
+      }
+      if (val.toLowerCase() === 'true') {
+        return true;
+      }
+      if (val.toLowerCase() === 'false') {
+        return false;
+      }
+
+      return val;
     }
-    clearInterval(intv);
-    main();
-  }, 100);
+  }
 
-  function main() {
-
-  // indexedDB
-  const DB_NAME = 'ews';
-  const DB_VERSION = 1;
-  const DB_STORE_NAME = account.account.uid + '-ews-custom-highlight';
 
   function Database() {
+    const DB_NAME = 'ews';
+    const DB_VERSION = 1;
+    const DB_STORE_NAME = account.account.uid + '-ews-custom-highlight';
+
     var getStore = function (mode, method, args, callback_success) {
       var
         db;
@@ -143,11 +216,12 @@ if (LOCAL) {
       getStore('readwrite', 'openCursor', null, callback);
     };
   }
-  // end: indexedDB
-
 
 
 var CustomHighlight = function () {
+  let initialColors = ['', '#FF0000', '#00FF00', '#0000FF'];
+
+  
   if (!K.ls.get('custom-highlight-color-update-2018-01-09')) {
     db.openCursor(function (cursor) {
       if (cursor) {
@@ -161,16 +235,6 @@ var CustomHighlight = function () {
   }
 
   this.currentColorIndex = +K.ls.get('custom-highlight-index') || 1;
-  if (!K.gid('ews-settings-group')) {
-    $('#settingsMenu').append(`
-      <div id="ews-settings-group" class="settings-group ews-settings-group invisible">
-        <h1>Stats Settings</h1>
-      </div>
-    `);
-  }
-
-  let initialColors = ['', '#FF0000', '#00FF00', '#0000FF'];
-
 
   function applyColor(color, index, inside = true) {
     var clr = inside ? color.toHexString() : color;
@@ -186,11 +250,11 @@ var CustomHighlight = function () {
   let ind = this.currentColorIndex;
   function colorSettingHTML(index) {
     return `
-    <div id="ews-custom-highlight-color-label-` + index + `" style="display: block">
-      <input type=radio name="ews-custom-highlight-color-radio-group" value=` + index +
-      (index == ind ? ' checked' : '') + `>
-      Highlight Color ` + index + `
-      <div id="ews-custom-highlight-color-` + index + `" data-index=` + index + `></div>
+    <div id="ews-custom-highlight-color-label-${index}" style="display: block">
+      <input type=radio name="ews-custom-highlight-color-radio-group" value=${index +
+      (index == ind ? ' checked' : '')}>
+      Highlight Color ${index}
+      <div id="ews-custom-highlight-color-${index}" data-index=${index}></div>
     </div>`;
   }
 
@@ -203,29 +267,7 @@ var CustomHighlight = function () {
   };
   
   let checked = K.ls.get('settings-unhighlight-all') === 'true';
-  
-  $('#ews-settings-group').append(`
-    <div class="setting">
-      <span>Unhighlight all colors</span>
-      <div class="checkbox ` + (checked ? 'on' : 'off') + `">
-        <div class="checkbox-handle"></div>
-        <input type="checkbox" id="unhighlight-all-colors-option" style="display: none;"` + (checked ? ' checked' : '') + `>
-      </div>
-    </div>
-  `);
-  
-  $('#unhighlight-all-colors-option').closest('div.setting').click(function (evt) {
-    evt.stopPropagation();
 
-    let $elem = $(this).find('input');
-    let elem = $elem[0];
-    let newState = !elem.checked;
-
-    K.ls.set('settings-unhighlight-all', newState);
-    elem.checked = newState;
-
-    $elem.add($elem.closest('.checkbox')).removeClass(newState ? 'off' : 'on').addClass(newState ? 'on' : 'off');
-  });
 
   let starterColor;
   let openedIndex;
@@ -253,7 +295,7 @@ var CustomHighlight = function () {
     });
   }
 
-  $('#ews-settings-group').append(
+  $('#ews-custom-highlight-settings-group').append(
     colorSettingHTML(1) +
     colorSettingHTML(2) +
     colorSettingHTML(3)
@@ -634,18 +676,18 @@ var CustomHighlight = function () {
             if (results.hasOwnProperty(id)) {
               row = results[id];
               html += `<tr
-                data-cell-id="` + row.cellId + `"
-                data-timestamp="` + row.timestamp + `"
-                data-dataset-id="` + row.dataset + `"
+                data-cell-id="${row.cellId}"
+                data-timestamp="${row.timestamp}"
+                data-dataset-id="${row.dataset}"
               >
                 <td>` +
                 (row.cubes[1] ? (`<span style="color: ` + _this.getColor(1) + `;">` + row.cubes[1]) + ` </span>` : '') +
                 (row.cubes[2] ? (`<span style="color: ` + _this.getColor(2) + `;">` + row.cubes[2]) + ` </span>` : '') +
                 (row.cubes[3] ? (`<span style="color: ` + _this.getColor(3) + `;">` + row.cubes[3]) + ` </span>` : '') +
                 `</td>
-                <td class="custom-highlighted-cell-name">` + row.name + `</td>
-                <td>` + row.cellId + `</td>
-                <td>` + (new Date(row.timestamp)).toLocaleString() + `</td>
+                <td class="custom-highlighted-cell-name">${row.name}</td>
+                <td>${row.cellId}</td>
+                <td>${(new Date(row.timestamp)).toLocaleString()}</td>
                 <td><button class="minimalButton">Remove</button></td>
               </tr>`;
             }
@@ -889,20 +931,8 @@ var CustomHighlight = function () {
     document.querySelector('.control.highlight button').disabled = false;
     document.querySelector('.control.highlight button').title = 'Show list of cells with custom highlighted cubes';
 };
-// end: CUSTOM HIGHLIGHT
 
 
-
-
-
-if (LOCAL) {
-  K.addCSSFile('http://127.0.0.1:8887/styles.css');
-  K.addCSSFile('http://127.0.0.1:8887/spectrum.css');
-}
-else {
-  K.addCSSFile('https://chrisraven.github.io/EyeWire-Custom-Highlight/styles.css?v=1');
-  K.addCSSFile('https://chrisraven.github.io/EyeWire-Custom-Highlight/spectrum.css?v=1');
-}
 
 
 // source: https://stackoverflow.com/a/14488776
@@ -918,33 +948,62 @@ $.widget('ui.dialog', $.extend({}, $.ui.dialog.prototype, {
   }
 }));
 
-var db, highlight;
 
 
-if (account.roles.scout || account.roles.scythe || account.roles.mystic || account.roles.admin) {
-  db = new Database();
-  highlight = new CustomHighlight();
-  
-  $(document).keyup(function (evt) {
-    if (evt.which !== 84) {
-      return;
-    }
+let db, highlight;
 
-    let index = highlight.currentColorIndex + 1;
-    if (index > 3) {
-      index = 1;
-    }
-    K.ls.set('custom-highlight-index', index);
-    highlight.currentColorIndex = index;
-    K.qS('#ews-custom-highlight-color-label-' + index + ' input').checked = true;
-    highlight.updateIndicator();
-  });
+function main() {
+  if (LOCAL) {
+    K.addCSSFile('http://127.0.0.1:8887/styles.css');
+    K.addCSSFile('http://127.0.0.1:8887/spectrum.css');
+  }
+  else {
+    K.addCSSFile('https://chrisraven.github.io/EyeWire-Custom-Highlight/styles.css?v=1');
+    K.addCSSFile('https://chrisraven.github.io/EyeWire-Custom-Highlight/spectrum.css?v=1');
+  }
+
+  if (account.can('scout scythe mystic admin')) {
+    let checked = K.ls.get('settings-unhighlight-all') === 'true';
+    let settings = new Settings();
+    settings.addCategory();
+    settings.addOption({
+      name: 'Unhighlight all colors',
+      id: 'unhighlight-all-colors-option',
+      state: checked,
+      defaultState: false
+    });
+
+
+    db = new Database();
+    highlight = new CustomHighlight();
+
+    
+    $(document).keyup(function (evt) {
+      if (evt.which !== 84) {
+        return;
+      }
+
+      let index = highlight.currentColorIndex + 1;
+      if (index > 3) {
+        index = 1;
+      }
+      K.ls.set('custom-highlight-index', index);
+      highlight.currentColorIndex = index;
+      K.qS('#ews-custom-highlight-color-label-' + index + ' input').checked = true;
+      highlight.updateIndicator();
+    });
+  }
 }
 
 
+var intv = setInterval(function () {
+  if (typeof account === 'undefined' || !account.account.uid) {
+    return;
+  }
+  clearInterval(intv);
+  main();
+}, 100);
 
-} // end: main()
 
 
-
-})(); // end: wrapper
+})();
