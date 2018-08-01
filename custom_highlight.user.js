@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.3
+// @version      1.3.1
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -373,7 +373,7 @@ var CustomHighlight = function () {
     // doesn't matter. Only order of adding items is important. By default the object
     // consists of objects with keys {1, 5, 6, 100}, so no matter, if I add 2, 10 or 1000, that
     // object will always be proceeded at the end overwriting settings from the previous objects
-    // Luckily, the {1} objects seems to ne unused, while it can be still used for the Custom Highlighting
+    // Luckily, the {1} object seems to be unused, while it can be still used for the Custom Highlighting
     // and the order in the highlights object won't change
     tomni.getCurrentCell().highlight({
       cubeids: cubeIds,
@@ -963,35 +963,43 @@ function main() {
   }
 
   if (account.can('scout scythe mystic admin')) {
-    let checked = K.ls.get('settings-unhighlight-all') === 'true';
-    let settings = new Settings();
-    settings.addCategory();
-    settings.addOption({
-      name: 'Unhighlight all colors',
-      id: 'unhighlight-all-colors-option',
-      state: checked,
-      defaultState: false
-    });
-
-
-    db = new Database();
-    highlight = new CustomHighlight();
-
-    
-    $(document).keyup(function (evt) {
-      if (evt.which !== 84) {
+    let intv = setInterval(function () {
+      if (!K.gid('cubeInspectorFloatingControls')) {
         return;
       }
 
-      let index = highlight.currentColorIndex + 1;
-      if (index > 3) {
-        index = 1;
-      }
-      K.ls.set('custom-highlight-index', index);
-      highlight.currentColorIndex = index;
-      K.qS('#ews-custom-highlight-color-label-' + index + ' input').checked = true;
-      highlight.updateIndicator();
-    });
+      clearInterval(intv);
+
+      let checked = K.ls.get('settings-unhighlight-all') === 'true';
+      let settings = new Settings();
+      settings.addCategory();
+      settings.addOption({
+        name: 'Unhighlight all colors',
+        id: 'unhighlight-all-colors-option',
+        state: checked,
+        defaultState: false
+      });
+
+
+      db = new Database();
+      highlight = new CustomHighlight();
+
+      
+      $(document).keyup(function (evt) {
+        if (evt.which !== 84) {
+          return;
+        }
+
+        let index = highlight.currentColorIndex + 1;
+        if (index > 3) {
+          index = 1;
+        }
+        K.ls.set('custom-highlight-index', index);
+        highlight.currentColorIndex = index;
+        K.qS('#ews-custom-highlight-color-label-' + index + ' input').checked = true;
+        highlight.updateIndicator();
+      });
+    }, 50);
   }
 }
 
