@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.3.1
+// @version      1.3.2
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -110,7 +110,15 @@ function Settings() {
 
       $.extend(settings, options);
       let storedState = K.ls.get(settings.id);
-      let state = storedState === null ? settings.defaultState : storedState.toLowerCase() === 'true';
+      let state;
+
+      if (storedState === null) {
+        K.ls.set(settings.id, settings.defaultState);
+        state = settings.defaultState;
+      }
+      else {
+        state = storedState.toLowerCase() === 'true';
+      }
 
       target.append(`
         <div class="setting" id="${settings.id}-wrapper">
@@ -219,7 +227,7 @@ function Settings() {
 
 
 var CustomHighlight = function () {
-  let initialColors = ['', '#FF0000', '#00FF00', '#0000FF'];
+  let initialColors = ['', '#d04f4f', '#2ecc71', '#e6c760'];
 
   
   if (!K.ls.get('custom-highlight-color-update-2018-01-09')) {
@@ -974,7 +982,7 @@ function main() {
       let settings = new Settings();
       settings.addCategory();
       settings.addOption({
-        name: 'Unhighlight all colors',
+        name: 'Unhighlight all colors at once',
         id: 'unhighlight-all-colors-option',
         state: checked,
         defaultState: false
