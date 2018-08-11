@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.3.2
+// @version      1.4
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -169,78 +169,10 @@ function Settings() {
   }
 
 
-  function Database() {
-    const DB_NAME = 'ews';
-    const DB_VERSION = 1;
-    const DB_STORE_NAME = account.account.uid + '-ews-custom-highlight';
-
-    var getStore = function (mode, method, args, callback_success) {
-      var
-        db;
-
-      db = indexedDB.open(DB_NAME, DB_VERSION);
-      db.onsuccess = function () {
-        var
-          store, req;
-
-        db = db.result;
-        store = db.transaction(DB_STORE_NAME, mode).objectStore(DB_STORE_NAME);
-        req = store[method](args);
-        req.onerror = function (evt){};
-        if (callback_success && typeof callback_success === 'function') {
-          req.onsuccess = function (evt) {
-            callback_success(evt.target.result);
-          };
-        }
-      };
-
-      db.onupgradeneeded = function (evt) {
-        evt.target.result.createObjectStore(DB_STORE_NAME, {keyPath: 'cellId'});
-      };
-    };
-
-
-    this.clearStore = function (callback) {
-      getStore('readwrite', 'clear', null, callback);
-    };
-
-    this.add = function (data, callback) {
-      getStore('readwrite', 'add', data, callback);
-    };
-
-    this.put = function (data, callback) {
-      getStore('readwrite', 'put', data, callback);
-    };
-
-    this.get = function (key, callback) {
-      getStore('readonly', 'get', key, callback);
-    };
-
-    this.delete = function (key, callback) {
-      getStore('readwrite', 'delete', key, callback);
-    };
-
-    this.openCursor = function (callback) {
-      getStore('readwrite', 'openCursor', null, callback);
-    };
-  }
-
-
 var CustomHighlight = function () {
   let initialColors = ['', '#d04f4f', '#2ecc71', '#e6c760'];
 
-  
-  if (!K.ls.get('custom-highlight-color-update-2018-01-09')) {
-    db.openCursor(function (cursor) {
-      if (cursor) {
-        cursor.value.cellId = cursor.value.cellId + '-1';
-        db.put(cursor);
-        cursor.continue();
-      }
-    });
-
-    K.ls.set('custom-highlight-color-update-2018-01-09', true);
-  }
+ K.ls.remove('custom-highlight-color-update-2018-01-09');
 
   this.currentColorIndex = +K.ls.get('custom-highlight-index') || 1;
 
@@ -273,9 +205,6 @@ var CustomHighlight = function () {
   this.bgColor = function (index) {
     K.gid('ews-custom-highlight-color-' + index).style.backgroundColor = this.getColor(index);
   };
-  
-  let checked = K.ls.get('settings-unhighlight-all') === 'true';
-
 
   let starterColor;
   let openedIndex;
@@ -376,7 +305,101 @@ var CustomHighlight = function () {
   highlightButton.classList.add('active');
 
 
-  this.highlight = function (cellId, cubeIds, index = this.currentColorIndex) {
+  this.db = {};
+
+  this.db.getAll = function () {
+    let data = K.ls.get('custom-highlight-cubes');
+
+    if (data) {
+      return JSON.parse(data);
+    }
+
+    return [];
+  };
+
+  this.db.saveAll = function (data) {
+    if (data) {
+      K.ls.set('custom-highlight-cubes', JSON.stringify(data));
+    }
+  };
+
+
+  this.db.add = function (data, highlight = true) {
+    let currentData = this.getAll();
+    let cell = currentData[data.cellId];
+    data.cubes = Array.isArray(data.cubes) ? data.cubes : [data.cubes];
+
+    if (!Object.keys(currentData).length) {
+      currentData = {};
+    }
+    
+    if (!cell) {
+      currentData[data.cellId] = {
+        timestamp: Date.now(),
+        name: data.name,
+        dataset: data.dataset,
+        cubes: {1: [], 2: [], 3: []}
+      };
+      currentData[data.cellId].cubes[data.colorIndex] = data.cubes;
+    }
+    else {
+      cell.timestamp = Date.now(),
+      cell.name = data.name, // in case, the name was changed
+      cell.cubes[data.colorIndex].push(...data.cubes);
+    }
+    
+    if (highlight) {
+      _this.highlight(currentData[data.cellId].cubes[data.colorIndex], data.colorIndex);
+    }
+
+    this.saveAll(currentData);
+  };
+
+  this.db.get = function (cellId, colorIndex) {
+    let currentData = this.getAll();
+    let cell = currentData[cellId];
+
+    if (cell) {
+      if (colorIndex) {
+        return cell.cubes[colorIndex];
+      }
+
+      return cell.cubes;
+    }
+
+    return [];
+  };
+
+  this.db.delete = function (cellId, cubes, colorIndex, highlight = true) {
+    colorIndex = typeof colorIndex !== 'undefined' ? colorIndex : _this.currentColorIndex;
+    cubes = Array.isArray(cubes) ? cubes : [cubes];
+
+    let currentData = this.getAll();
+    let cell = currentData[cellId];
+
+    if (cell) {
+      cell.cubes[colorIndex] = cell.cubes[colorIndex].filter(x => cubes.indexOf(x) === -1);
+      if (highlight) {
+        _this.highlight(cell.cubes[colorIndex], colorIndex);
+      }
+
+      this.saveAll(currentData);
+    }
+  };
+
+  this.db.deleteCell = function (cellId) {
+    let currentData = this.getAll();
+    let cell = currentData[cellId];
+
+    if (cell && currentData[cellId]) {
+      delete currentData[cellId];
+
+      this.saveAll(currentData);
+    }
+  };
+
+
+  this.highlight = function (cubeIds, index = this.currentColorIndex) {
     // zindex = 1, because the higlights object is processed using .forEach(), where the order of the indices
     // doesn't matter. Only order of adding items is important. By default the object
     // consists of objects with keys {1, 5, 6, 100}, so no matter, if I add 2, 10 or 1000, that
@@ -398,27 +421,15 @@ var CustomHighlight = function () {
 
   this.highlightCell = function () {
     var
+      result,
       cellId = this.getCurrentCellId();
 
       if (cellId !== currentCellId) {
-        db.get(cellId + '-1', function (result) {
-          if (result) {
-            _this.highlight(cellId, result.cubeIds, 1);
-            currentCellId = cellId;
-          }
-        });
-        db.get(cellId + '-2', function (result) {
-          if (result) {
-            _this.highlight(cellId, result.cubeIds, 2);
-            currentCellId = cellId;
-          }
-        });
-        db.get(cellId + '-3', function (result) {
-          if (result) {
-            _this.highlight(cellId, result.cubeIds, 3);
-            currentCellId = cellId;
-          }
-        });
+        result = this.db.get(cellId);
+        this.highlight(result[1], 1);
+        this.highlight(result[2], 2);
+        this.highlight(result[3], 3);
+        currentCellId = cellId;
       }
   };
 
@@ -431,197 +442,122 @@ var CustomHighlight = function () {
   };
 
   this.add = function (direction) {
-    var
-      cubes, cellName,
+    let
       cubeId = this.getCurrentCubeId(),
-      cellId = this.getCurrentCellId();
+      cellId = this.getCurrentCellId(),
+      info = tomni.getCurrentCell().info;
 
     if (direction && (direction.parents || direction.children)) {
       this.addRelatives(direction, cubeId);
     }
     else {
-      db.get(cellId + '-' + _this.currentColorIndex, function (result) {
-        if (!result) {
-          cubes = [cubeId];
-          cellName = tomni.getCurrentCell().info.name;
-        }
-        else {
-          // source: https://stackoverflow.com/a/38940354
-          cubes = [...new Set([...result.cubeIds, cubeId])];
-          cellName = result.name;
-        }
-
-        db.put({
-          cellId: cellId + '-' + _this.currentColorIndex,
-          cubeIds: cubes,
-          timestamp: Date.now(),
-          name: cellName,
-          datasetId: tomni.getCurrentCell().info.dataset_id
-          }, function () {
-            _this.highlight(cellId, cubes);
-        });
+      this.db.add({
+        cellId: cellId,
+        cubes: cubeId,
+        name: info.name,
+        dataset: info.dataset_id,
+        colorIndex: this.currentColorIndex
       });
     }
   };
 
 
   this.addRelatives = function (direction, self) {
-    var
-      dataToUse, cubes, cellName,
+    let
+      dataToUse,
+      _this = this,
       cellId = this.getCurrentCellId();
 
     $.getJSON('/1.0/task/' + self + '/hierarchy', function (data) {
       dataToUse = direction.parents ? data.ancestors : data.descendants;
-      db.get(cellId + '-' + _this.currentColorIndex, function (result) {
-        if (!result) {
-          cubes = [...dataToUse, self];
-          cellName = tomni.getCurrentCell().info.name;
-        }
-        else {
-          cubes = [...new Set([...result.cubeIds, ...dataToUse, self])];
-          cellName = result.name;
-        }
-        db.put({
-          cellId: cellId + '-' + _this.currentColorIndex,
-          cubeIds: cubes,
-          timestamp: Date.now(),
-          name: cellName,
-          datasetId: tomni.getCurrentCell().info.dataset_id
-          }, function () {
-            _this.highlight(cellId, cubes);
-        });
+      let info = tomni.getCurrentCell().info;
+
+      _this.db.add({
+        cellId: cellId,
+        cubes: dataToUse,
+        name: info.name,
+        dataset: info.dataset_id,
+        colorIndex: _this.currentColorIndex
       });
     });
   };
 
 
   this.remove = function (direction) {
-    var
-      index,
+    let
       cubeId = this.getCurrentCubeId(),
       cellId = this.getCurrentCellId(),
       unhighlightAll = K.ls.get('settings-unhighlight-all');
-      
-    let rem = function (cellId, suffix) {
-      let cellName = cellId + (suffix ? '-' + suffix : '');
-
-      db.get(cellName, function (result) {
-        if (result) {
-          index = result.cubeIds.indexOf(cubeId);
-          if (index > -1) {
-            result.cubeIds.splice(index, 1);
-            if (!result.cubeIds.length) {
-              db.delete(cellName, function () {
-                _this.highlight(cellId, result.cubeIds, suffix);
-              });
-            }
-            else {
-              result.timestamp = Date.now();
-              db.put(result);
-              _this.highlight(cellId, result.cubeIds, suffix);
-            }
-          }
-        }
-      });
-    };
 
     if (direction && (direction.parents || direction.children)) {
       this.removeRelatives(direction, cubeId);
     }
     else {
       if (unhighlightAll && unhighlightAll === 'true') {
-        rem(cellId, '1');
-        rem(cellId, '2');
-        rem(cellId, '3');
+        this.db.delete(cellId, [cubeId], 1);
+        this.db.delete(cellId, [cubeId], 2);
+        this.db.delete(cellId, [cubeId], 3);
       }
       else {
-        rem(cellId, this.currentColorIndex);
+        this.db.delete(cellId, [cubeId]);
+      }
+
+      let result = this.db.getAll();
+      if (result && result[cellId]) {
+        let cubes = result[cellId].cubes;
+    
+        if (!cubes[1].length && !cubes[2].length && !cubes[3].length) {
+          this.db.deleteCell(cellId);
+        }
       }
     }
   };
 
 
   this.removeRelatives = function (direction, self) {
-    var
+    let
       dataToUse,
       cellId = this.getCurrentCellId(),
       unhighlightAll = K.ls.get('settings-unhighlight-all');
-      
-    let rem = function (cellId, suffix) {
-      let cellName = cellId + (suffix ? '-' + suffix : '');
-
-      db.get(cellName, function (result) {
-        var cubes;
-
-        if (result) {
-          // source: https://stackoverflow.com/a/33034768
-          cubes = result.cubeIds.filter(x => dataToUse.indexOf(x) == -1);
-          result.cubeIds = cubes;
-          if (!result.cubeIds.length) {
-            db.delete(cellName, function () {
-              _this.highlight(cellId, cubes, suffix);
-            });
-          }
-          else {
-            result.timestamp = Date.now();
-            db.put(result);
-            _this.highlight(cellId, cubes, suffix);
-          }
-        }
-      });
-    };
 
     $.getJSON('/1.0/task/' + self + '/hierarchy', function (data) {
       dataToUse = direction.parents ? data.ancestors : data.descendants;
       dataToUse.push(self);
       if (unhighlightAll && unhighlightAll === 'true') {
-        rem(cellId, '1');
-        rem(cellId, '2');
-        rem(cellId, '3');
+        _this.db.delete(cellId, dataToUse, 1);
+        _this.db.delete(cellId, dataToUse, 2);
+        _this.db.delete(cellId, dataToUse, 3);
       }
       else {
-        rem(cellId, _this.currentColorIndex);
+        _this.db.delete(cellId, dataToUse, _this.currentColorIndex);
+      }
+
+      let result = _this.db.getAll();
+      if (result && result[cellId]) {
+        let cubes = result[cellId].cubes;
+    
+        if (!cubes[1].length && !cubes[2].length && !cubes[3].length) {
+          _this.db.deleteCell(cellId);
+        }
       }
     });
   };
 
   this.removeCell = function (cellId) {
-    db.delete(cellId + '-1', function () {
-      if (cellId == tomni.cell) {
-        _this.unhighlight(1);
-      }
-    });
-    db.delete(cellId + '-2', function () {
-      if (cellId == tomni.cell) {
-        _this.unhighlight(2);
-      }
-    });
-    db.delete(cellId + '-3', function () {
-      if (cellId == tomni.cell) {
-        _this.unhighlight(3);
-      }
-    });
+    this.db.deleteCell(cellId);
+    this.unhighlight(1);
+    this.unhighlight(2);
+    this.unhighlight(3);
   };
 
   this.refresh = function () {
-    var
-      cellId = this.getCurrentCellId();
+    let
+      cellId = this.getCurrentCellId(),
+      result = this.db.get(cellId);
 
-      db.get(cellId + '-1', function (result) {
-        if (result) {
-          _this.highlight(cellId, result.cubeIds, 1);
-        }
-      });
-      db.get(cellId + '-2', function (result) {
-        if (result) {
-          _this.highlight(cellId, result.cubeIds, 2);
-        }
-      });
-      db.get(cellId + '-3', function (result) {
-        if (result) {
-          _this.highlight(cellId, result.cubeIds, 3);
-        }
-      });
+    _this.highlight(result[1], 1);
+    _this.highlight(result[2], 2);
+    _this.highlight(result[3], 3);
   };
 
 
@@ -652,60 +588,32 @@ var CustomHighlight = function () {
     </tr></thead>`;
     html += '<tbody>';
 
-    let results = [];
-    let cell, cellId, index, v, row;
-    db.openCursor(function (cursor) {
-      if (cursor) {
-        v = cursor.value;
-        cell = v.cellId.split('-');
-        cellId = cell[0];
-        index = cell[1];
-        if (results[cellId]) {
-          results[cellId].cubes[index] = v.cubeIds.length;
-          if (v.timestamp > results[cellId].timestamp) {
-            results[cellId].timestamp = v.timestamp;
-          }
-        }
-        else {
-          results[cellId] = {
-            cellId: cellId,
-            cubes: {
-              [index]: v.cubeIds.length
-            },
-            name: v.name,
-            timestamp: v.timestamp,
-            dataset: v.datasetId
-          };
-        }
-        cursor.continue();
+    let row;
+    let results = this.db.getAll();
+    for (let id in results) {
+      if (results.hasOwnProperty(id)) {
+        row = results[id];
+        html += `<tr
+          data-cell-id="${id}"
+          data-timestamp="${row.timestamp}"
+          data-dataset-id="${row.dataset}"
+        >
+          <td>` +
+          (row.cubes[1] ? (`<span style="color: ` + _this.getColor(1) + `;">` + (row.cubes[1].length || '')) + ` </span>` : '') +
+          (row.cubes[2] ? (`<span style="color: ` + _this.getColor(2) + `;">` + (row.cubes[2].length || '')) + ` </span>` : '') +
+          (row.cubes[3] ? (`<span style="color: ` + _this.getColor(3) + `;">` + (row.cubes[3].length || '')) + ` </span>` : '') +
+          `</td>
+          <td class="custom-highlighted-cell-name">${row.name}</td>
+          <td>${id}</td>
+          <td>${(new Date(row.timestamp)).toLocaleString()}</td>
+          <td><button class="minimalButton">Remove</button></td>
+        </tr>`;
       }
-      else {
-          for (let id in results) {
-            if (results.hasOwnProperty(id)) {
-              row = results[id];
-              html += `<tr
-                data-cell-id="${row.cellId}"
-                data-timestamp="${row.timestamp}"
-                data-dataset-id="${row.dataset}"
-              >
-                <td>` +
-                (row.cubes[1] ? (`<span style="color: ` + _this.getColor(1) + `;">` + row.cubes[1]) + ` </span>` : '') +
-                (row.cubes[2] ? (`<span style="color: ` + _this.getColor(2) + `;">` + row.cubes[2]) + ` </span>` : '') +
-                (row.cubes[3] ? (`<span style="color: ` + _this.getColor(3) + `;">` + row.cubes[3]) + ` </span>` : '') +
-                `</td>
-                <td class="custom-highlighted-cell-name">${row.name}</td>
-                <td>${row.cellId}</td>
-                <td>${(new Date(row.timestamp)).toLocaleString()}</td>
-                <td><button class="minimalButton">Remove</button></td>
-              </tr>`;
-            }
-          }
-        html += '</tbody></table>';
+    }
+    html += '</tbody></table>';
 
-        K.gid('ewsCustomHighlightedCellsWrapper').innerHTML = html;
-        $('#ewsCustomHighlightedCells').dialog('open');
-      }
-    });
+    K.gid('ewsCustomHighlightedCellsWrapper').innerHTML = html;
+    $('#ewsCustomHighlightedCells').dialog('open');
   };
 
 
@@ -887,13 +795,12 @@ var CustomHighlight = function () {
 
   doc
     .on('click', '.custom-highlight button', function () {
-      if ($(this).hasClass('active')) {
-        // if (this.classList.contains('active')) {}
-        _this.add();
+      if (this.classList.contains('active')) {
+      _this.add();
       }
     })
     .on('click', '.custom-unhighlight button', function () {
-      if ($(this).hasClass('active')) {
+      if (this.classList.contains('active')) {
         _this.remove();
       }
     })
@@ -918,7 +825,7 @@ var CustomHighlight = function () {
       }
     })
     .on('click', '.control.highlight button', function () {
-      if ($(this).hasClass('active')) {
+      if (this.classList.contains('active')) {
         _this.showList();
       }
     });
@@ -958,7 +865,7 @@ $.widget('ui.dialog', $.extend({}, $.ui.dialog.prototype, {
 
 
 
-let db, highlight;
+let highlight;
 
 function main() {
   if (LOCAL) {
@@ -983,13 +890,11 @@ function main() {
       settings.addCategory();
       settings.addOption({
         name: 'Unhighlight all colors at once',
-        id: 'unhighlight-all-colors-option',
+        id: 'settings-unhighlight-all',
         state: checked,
         defaultState: false
       });
 
-
-      db = new Database();
       highlight = new CustomHighlight();
 
       
