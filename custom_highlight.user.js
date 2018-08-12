@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.4
+// @version      1.4.1
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -470,6 +470,8 @@ var CustomHighlight = function () {
 
     $.getJSON('/1.0/task/' + self + '/hierarchy', function (data) {
       dataToUse = direction.parents ? data.ancestors : data.descendants;
+      dataToUse.push(self);
+
       let info = tomni.getCurrentCell().info;
 
       _this.db.add({
