@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.4.1
+// @version      1.4.2
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -547,9 +547,11 @@ var CustomHighlight = function () {
 
   this.removeCell = function (cellId) {
     this.db.deleteCell(cellId);
-    this.unhighlight(1);
-    this.unhighlight(2);
-    this.unhighlight(3);
+    if (cellId === this.getCurrentCellId()) {
+      this.unhighlight(1);
+      this.unhighlight(2);
+      this.unhighlight(3);
+    }
   };
 
   this.refresh = function () {
