@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.5.1
+// @version      1.5.1.1
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -875,6 +875,7 @@ var CustomHighlight = function () {
         tasks = tasks.tasks.filter(el => potential.indexOf(el.id) === -1);
         tasks = tasks.map(el => el.id);
 
+        _this.db.deleteCell(cellId);
         _this.db.add({
           cellId: cellId,
           cubes: tasks,
