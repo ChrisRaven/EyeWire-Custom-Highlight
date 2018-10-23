@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.5
+// @version      1.5.1
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -842,6 +842,9 @@ var CustomHighlight = function () {
       )
       .done(function (tasks, scythe, completed) {
         let potential, complete, uid, completedByMe;
+        let cellId = _this.getCurrentCellId();
+        let info = tomni.getCurrentCell().info;
+        
   
         tasks = tasks[0];
         complete = scythe[0].complete || [];
@@ -871,7 +874,15 @@ var CustomHighlight = function () {
   
         tasks = tasks.tasks.filter(el => potential.indexOf(el.id) === -1);
         tasks = tasks.map(el => el.id);
-        _this.highlight(tasks);
+
+        _this.db.add({
+          cellId: cellId,
+          cubes: tasks,
+          name: info.name,
+          dataset: info.dataset_id,
+          colorIndex: _this.currentColorIndex
+        });
+        _this.refresh();
       });
     });
 
