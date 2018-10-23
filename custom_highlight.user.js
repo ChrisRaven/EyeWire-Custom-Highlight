@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.4.2
+// @version      1.5
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -698,7 +698,6 @@ var CustomHighlight = function () {
     }
   });
 
-
   let doc = $(document);
 
   doc.on('change', 'input[name="ews-custom-highlight-color-radio-group"]', function() {
@@ -832,6 +831,48 @@ var CustomHighlight = function () {
       if (this.classList.contains('active')) {
         _this.showList();
       }
+    })
+    .on('click', '#cubeInspectorFloatingControls .controls .inspect .parents', function () {
+      let cellId = tomni.cell;
+
+      $.when(
+        $.getJSON("/1.0/cell/" + cellId + "/tasks"),
+        $.getJSON("/1.0/cell/" + cellId + "/heatmap/scythe"),
+        $.getJSON("/1.0/cell/" + cellId + "/tasks/complete/player")
+      )
+      .done(function (tasks, scythe, completed) {
+        let potential, complete, uid, completedByMe;
+  
+        tasks = tasks[0];
+        complete = scythe[0].complete || [];
+        completed = completed[0];
+  
+        
+        potential = tasks.tasks.filter(x => (x.status === 0 || x.status === 11) && x.weight >= 3);
+        potential = potential.map(x => x.id);
+        complete = complete.filter(x => x.votes >= 2 && !account.account.admin);
+        complete = complete.map(x => x.id);
+        potential = potential.filter(x => complete.indexOf(x) === -1);
+  
+        uid = account.account.uid;
+        if (completed && completed.scythe[uid] && completed.scythe[uid].length) {
+          // otherwise the concat() function will add "undefined" at the end of the table if the admin table is empty
+          if (completed.admin[uid]) {
+            completedByMe = completed.scythe[uid].concat(completed.admin[uid]);
+          }
+          else {
+            completedByMe = completed.scythe[uid];
+          }
+        }
+        else {
+          completedByMe = [];
+        }
+        potential = potential.filter(x => completedByMe.indexOf(x) === -1);
+  
+        tasks = tasks.tasks.filter(el => potential.indexOf(el.id) === -1);
+        tasks = tasks.map(el => el.id);
+        _this.highlight(tasks);
+      });
     });
 
   doc
@@ -845,6 +886,11 @@ var CustomHighlight = function () {
 
       _this.removeCell(parseInt(cellId, 10));
       row.remove();
+    })
+    .on('ews-setting-changed', function (evt, data) {
+      if (data.setting === 'settings-show-higlight-unavailable-for-sc-cubes-button') {
+        K.qS('#cubeInspectorFloatingControls .controls .inspect .parents').style.display = data.state ? 'block' : 'none';
+      }
     });
 
     document.querySelector('.control.highlight button').disabled = false;
@@ -877,7 +923,7 @@ function main() {
     K.addCSSFile('http://127.0.0.1:8887/spectrum.css');
   }
   else {
-    K.addCSSFile('https://chrisraven.github.io/EyeWire-Custom-Highlight/styles.css?v=1');
+    K.addCSSFile('https://chrisraven.github.io/EyeWire-Custom-Highlight/styles.css?v=2');
     K.addCSSFile('https://chrisraven.github.io/EyeWire-Custom-Highlight/spectrum.css?v=1');
   }
 
@@ -889,8 +935,9 @@ function main() {
 
       clearInterval(intv);
 
-      let checked = K.ls.get('settings-unhighlight-all') === 'true';
       let settings = new Settings();
+
+      let checked = K.ls.get('settings-unhighlight-all') === 'true';
       settings.addCategory();
       settings.addOption({
         name: 'Unhighlight all colors at once',
@@ -899,7 +946,21 @@ function main() {
         defaultState: false
       });
 
+      // new object must be created after the first setting, because it depends on the settings,
+      // but before the second setting, because the second setting depends on the new object
       highlight = new CustomHighlight();
+
+      if (account.can('scythe mystic admin')) {
+        checked = K.ls.get('settings-show-higlight-unavailable-for-sc-cubes-button') === 'true';
+        settings.addOption({
+          name: 'Show "Highlight unavailable for SC cubes" button',
+          id: 'settings-show-higlight-unavailable-for-sc-cubes-button',
+          state: checked,
+          defaultState: false
+        });
+
+        K.qS('#cubeInspectorFloatingControls .controls .inspect .parents').title = 'Highlight unavailable for SC cubes';
+      }
 
       
       $(document).keyup(function (evt) {
