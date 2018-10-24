@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.5.1.1
+// @version      1.5.2
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -885,6 +885,12 @@ var CustomHighlight = function () {
         });
         _this.refresh();
       });
+    })
+    .on('contextmenu', '#cubeInspectorFloatingControls .controls .inspect .parents', function (evt) {
+      evt.stopPropagation();
+      evt.preventDefault();
+      _this.db.deleteCell( _this.getCurrentCellId());
+      _this.refresh();
     });
 
   doc
