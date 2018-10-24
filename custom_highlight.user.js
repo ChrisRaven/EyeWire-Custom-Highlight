@@ -908,6 +908,7 @@ var CustomHighlight = function () {
     .on('ews-setting-changed', function (evt, data) {
       if (data.setting === 'settings-show-higlight-unavailable-for-sc-cubes-button') {
         K.qS('#cubeInspectorFloatingControls .controls .inspect .parents').style.display = data.state ? 'block' : 'none';
+        K.qS('#cubeInspectorFloatingControls .controls .inspect .parents').title = data.state ? 'Highlight unavailable for SC cubes (right-click to remove all highlights)' : '';
       }
     });
 
@@ -977,7 +978,7 @@ function main() {
           defaultState: false
         });
 
-        K.qS('#cubeInspectorFloatingControls .controls .inspect .parents').title = 'Highlight unavailable for SC cubes';
+        K.qS('#cubeInspectorFloatingControls .controls .inspect .parents').title = 'Highlight unavailable for SC cubes (right-click to remove all highlights)';
       }
 
       
