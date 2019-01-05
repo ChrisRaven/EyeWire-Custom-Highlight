@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.5.2
+// @version      1.6
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -170,9 +170,7 @@ function Settings() {
 
 
 var CustomHighlight = function () {
-  let initialColors = ['', '#d04f4f', '#2ecc71', '#e6c760'];
-
- K.ls.remove('custom-highlight-color-update-2018-01-09');
+  let initialColors = ['', '#d04f4f', '#2ecc71', '#e6c760', '#0000ff'];
 
   this.currentColorIndex = +K.ls.get('custom-highlight-index') || 1;
 
@@ -184,6 +182,7 @@ var CustomHighlight = function () {
 
     if (highlight) {
       highlight.refresh();
+      highlight.refresh('x');
     }
   }
 
@@ -238,13 +237,23 @@ var CustomHighlight = function () {
     colorSettingHTML(3)
   );
 
+  $('#ews-custom-highlight-settings-group').append(`
+    <div id="ews-custom-highlight-color-label-4" style="display: block">
+    X-Highlight Color
+    <div id="ews-custom-highlight-color-4" data-index=4></div>
+  </div>`
+  );
+
+
   this.bgColor(1);
   this.bgColor(2);
   this.bgColor(3);
+  this.bgColor(4); // XColor
 
   this.initSpectrum(1);
   this.initSpectrum(2);
   this.initSpectrum(3);
+  this.initSpectrum(4); // XColor
 
   $('.sp-cancel, .sp-choose').addClass('minimalButton');
   
@@ -257,7 +266,6 @@ var CustomHighlight = function () {
 
   var
     _this = this,
-    currentCellId = '',
     highlightButton = document.querySelector('.control.highlight button');
 
   $('body').append('<div id="ewsCustomHighlightedCells"><div id="ewsCustomHighlightedCellsWrapper"></div></div>');
@@ -270,7 +278,7 @@ var CustomHighlight = function () {
     dialogClass: 'ews-dialog',
     title: 'Cells containing your Custom Highlighted cubes',
     width: 800,
-    open: function (event, ui) {
+    open: function () {
       $('.ui-widget-overlay').click(function() { // close by clicking outside the window
         $('#ewsCustomHighlightedCells').dialog('close');
       });
@@ -307,8 +315,8 @@ var CustomHighlight = function () {
 
   this.db = {};
 
-  this.db.getAll = function () {
-    let data = K.ls.get('custom-highlight-cubes');
+  this.db.getAll = function (type) {
+    let data = K.ls.get(type && type === 'x' ? 'custom-x-highlight-cubes' : 'custom-highlight-cubes');
 
     if (data) {
       return JSON.parse(data);
@@ -317,50 +325,80 @@ var CustomHighlight = function () {
     return [];
   };
 
-  this.db.saveAll = function (data) {
+
+  this.db.saveAll = function (data, type) {
     if (data) {
-      K.ls.set('custom-highlight-cubes', JSON.stringify(data));
+      K.ls.set(type && type === 'x' ? 'custom-x-highlight-cubes' : 'custom-highlight-cubes', JSON.stringify(data));
     }
   };
 
 
   this.db.add = function (data, highlight = true) {
-    let currentData = this.getAll();
+    let currentData = this.getAll(data.type);
     let cell = currentData[data.cellId];
     data.cubes = Array.isArray(data.cubes) ? data.cubes : [data.cubes];
 
     if (!Object.keys(currentData).length) {
       currentData = {};
     }
-    
-    if (!cell) {
-      currentData[data.cellId] = {
-        timestamp: Date.now(),
-        name: data.name,
-        dataset: data.dataset,
-        cubes: {1: [], 2: [], 3: []}
-      };
-      currentData[data.cellId].cubes[data.colorIndex] = data.cubes;
+
+    if (data.type && data.type === 'x') {
+      if (K.ls.get('settings-x-highlight') !== 'true') {
+        return;
+      }
+      if (!cell) {
+        currentData[data.cellId] = {
+          timestamp: Date.now(),
+          name: data.name,
+          dataset: data.dataset,
+          cubes: []
+        };
+        currentData[data.cellId].cubes = data.cubes;
+      }
+      else {
+        cell.timestamp = Date.now(),
+        cell.name = data.name, // in case, the name was changed
+        cell.cubes.push(...data.cubes);
+        cell.cubes = [...new Set(cell.cubes)];
+      }
+
+      if (highlight) {
+        _this.highlight(currentData[data.cellId].cubes, 4);
+      }
+
+      this.saveAll(currentData, 'x');
     }
     else {
-      cell.timestamp = Date.now(),
-      cell.name = data.name, // in case, the name was changed
-      cell.cubes[data.colorIndex].push(...data.cubes);
-    }
-    
-    if (highlight) {
-      _this.highlight(currentData[data.cellId].cubes[data.colorIndex], data.colorIndex);
-    }
+      if (!cell) {
+        currentData[data.cellId] = {
+          timestamp: Date.now(),
+          name: data.name,
+          dataset: data.dataset,
+          cubes: {1: [], 2: [], 3: []}
+        };
+        currentData[data.cellId].cubes[data.colorIndex] = data.cubes;
+      }
+      else {
+        cell.timestamp = Date.now(),
+        cell.name = data.name, // in case, the name was changed
+        cell.cubes[data.colorIndex].push(...data.cubes);
+        cell.cubes[data.colorIndex] = [...new Set(cell.cubes[data.colorIndex])];
+      }
+      
+      if (highlight) {
+        _this.highlight(currentData[data.cellId].cubes[data.colorIndex], data.colorIndex);
+      }
 
-    this.saveAll(currentData);
+      this.saveAll(currentData);
+    }
   };
 
-  this.db.get = function (cellId, colorIndex) {
-    let currentData = this.getAll();
+  this.db.get = function (cellId, colorIndex, type) {
+    let currentData = this.getAll(type);
     let cell = currentData[cellId];
 
     if (cell) {
-      if (colorIndex) {
+      if (colorIndex && (!type || type !== 'x')) {
         return cell.cubes[colorIndex];
       }
 
@@ -370,31 +408,46 @@ var CustomHighlight = function () {
     return [];
   };
 
-  this.db.delete = function (cellId, cubes, colorIndex, highlight = true) {
+  this.db.delete = function (cellId, cubes, colorIndex, highlight = true, type) {
     colorIndex = typeof colorIndex !== 'undefined' ? colorIndex : _this.currentColorIndex;
     cubes = Array.isArray(cubes) ? cubes : [cubes];
 
-    let currentData = this.getAll();
+    let currentData = this.getAll(type);
     let cell = currentData[cellId];
 
-    if (cell) {
-      cell.cubes[colorIndex] = cell.cubes[colorIndex].filter(x => cubes.indexOf(x) === -1);
-      if (highlight) {
-        _this.highlight(cell.cubes[colorIndex], colorIndex);
+    if (type && type === 'x') {
+      if (K.ls.get('settings-x-highlight') !== 'true') {
+        return;
       }
+      if (cell) {
+        cell.cubes = cell.cubes.filter(x => cubes.indexOf(x) === -1);
+        if (highlight) {
+          _this.highlight(cell.cubes, 4);
+        }
 
-      this.saveAll(currentData);
+        this.saveAll(currentData, 'x');
+      }
+    }
+    else {
+     if (cell) {
+        cell.cubes[colorIndex] = cell.cubes[colorIndex].filter(x => cubes.indexOf(x) === -1);
+        if (highlight) {
+          _this.highlight(cell.cubes[colorIndex], colorIndex);
+        }
+
+        this.saveAll(currentData);
+      }
     }
   };
 
-  this.db.deleteCell = function (cellId) {
-    let currentData = this.getAll();
+  this.db.deleteCell = function (cellId, type) {
+    let currentData = this.getAll(type);
     let cell = currentData[cellId];
 
     if (cell && currentData[cellId]) {
       delete currentData[cellId];
 
-      this.saveAll(currentData);
+      this.saveAll(currentData, type);
     }
   };
 
@@ -424,13 +477,12 @@ var CustomHighlight = function () {
       result,
       cellId = this.getCurrentCellId();
 
-      if (cellId !== currentCellId) {
-        result = this.db.get(cellId);
-        this.highlight(result[1], 1);
-        this.highlight(result[2], 2);
-        this.highlight(result[3], 3);
-        currentCellId = cellId;
-      }
+      this.highlight(this.db.get(cellId, null, 'x'), 4);
+
+      result = this.db.get(cellId);
+      this.highlight(result[1], 1);
+      this.highlight(result[2], 2);
+      this.highlight(result[3], 3);
   };
 
   this.getCurrentCubeId = function () {
@@ -441,17 +493,17 @@ var CustomHighlight = function () {
     return tomni.getCurrentCell().id;
   };
 
-  this.add = function (direction) {
-    let
-      cubeId = this.getCurrentCubeId(),
-      cellId = this.getCurrentCellId(),
-      info = tomni.getCurrentCell().info;
+  this.add = function (direction, type, cubeId) {
+    cubeId = cubeId || this.getCurrentCubeId();
+    let cellId = this.getCurrentCellId();
+    let info = tomni.getCurrentCell().info;
 
     if (direction && (direction.parents || direction.children)) {
       this.addRelatives(direction, cubeId);
     }
     else {
       this.db.add({
+        type: type && type === 'x' ? 'x' : undefined,
         cellId: cellId,
         cubes: cubeId,
         name: info.name,
@@ -460,7 +512,6 @@ var CustomHighlight = function () {
       });
     }
   };
-
 
   this.addRelatives = function (direction, self) {
     let
@@ -484,32 +535,40 @@ var CustomHighlight = function () {
     });
   };
 
+  this.remove = function (direction, type, cubeId) {
+    cubeId = cubeId || this.getCurrentCubeId();
 
-  this.remove = function (direction) {
-    let
-      cubeId = this.getCurrentCubeId(),
-      cellId = this.getCurrentCellId(),
-      unhighlightAll = K.ls.get('settings-unhighlight-all');
+    let cellId = this.getCurrentCellId();
+    let unhighlightAll = K.ls.get('settings-unhighlight-all');
 
-    if (direction && (direction.parents || direction.children)) {
-      this.removeRelatives(direction, cubeId);
+    if (type && type === 'x') {
+      this.db.delete(cellId, [cubeId], null, true, 'x');
+      let result = this.db.getAll('x');
+      if (!result[cellId].cubes.length) {
+        this.db.deleteCell(cellId, 'x');
+      }
     }
     else {
-      if (unhighlightAll && unhighlightAll === 'true') {
-        this.db.delete(cellId, [cubeId], 1);
-        this.db.delete(cellId, [cubeId], 2);
-        this.db.delete(cellId, [cubeId], 3);
+      if (direction && (direction.parents || direction.children)) {
+        this.removeRelatives(direction, cubeId);
       }
       else {
-        this.db.delete(cellId, [cubeId]);
-      }
+        if (unhighlightAll && unhighlightAll === 'true') {
+          this.db.delete(cellId, [cubeId], 1);
+          this.db.delete(cellId, [cubeId], 2);
+          this.db.delete(cellId, [cubeId], 3);
+        }
+        else {
+          this.db.delete(cellId, [cubeId]);
+        }
 
-      let result = this.db.getAll();
-      if (result && result[cellId]) {
-        let cubes = result[cellId].cubes;
-    
-        if (!cubes[1].length && !cubes[2].length && !cubes[3].length) {
-          this.db.deleteCell(cellId);
+        let result = this.db.getAll();
+        if (result && result[cellId]) {
+          let cubes = result[cellId].cubes;
+      
+          if (!cubes[1].length && !cubes[2].length && !cubes[3].length) {
+            this.db.deleteCell(cellId);
+          }
         }
       }
     }
@@ -545,23 +604,33 @@ var CustomHighlight = function () {
     });
   };
 
-  this.removeCell = function (cellId) {
-    this.db.deleteCell(cellId);
+  this.removeCell = function (cellId, type) {
+    this.db.deleteCell(cellId, type);
     if (cellId === this.getCurrentCellId()) {
-      this.unhighlight(1);
-      this.unhighlight(2);
-      this.unhighlight(3);
+      if (type && type === 'x') {
+        this.unhighlight(4);
+      }
+      else {
+        this.unhighlight(1);
+        this.unhighlight(2);
+        this.unhighlight(3);
+      }
     }
   };
 
-  this.refresh = function () {
+  this.refresh = function (type) {
     let
       cellId = this.getCurrentCellId(),
-      result = this.db.get(cellId);
+      result = this.db.get(cellId, null, type);
 
-    _this.highlight(result[1], 1);
-    _this.highlight(result[2], 2);
-    _this.highlight(result[3], 3);
+    if (type && type === 'x') {
+      _this.highlight(result, 4);
+    }
+    else {
+      _this.highlight(result[1], 1);
+      _this.highlight(result[2], 2);
+      _this.highlight(result[3], 3);
+    }
   };
 
 
@@ -603,9 +672,9 @@ var CustomHighlight = function () {
           data-dataset-id="${row.dataset}"
         >
           <td>` +
-          (row.cubes[1] ? (`<span style="color: ` + _this.getColor(1) + `;">` + (row.cubes[1].length || '')) + ` </span>` : '') +
-          (row.cubes[2] ? (`<span style="color: ` + _this.getColor(2) + `;">` + (row.cubes[2].length || '')) + ` </span>` : '') +
-          (row.cubes[3] ? (`<span style="color: ` + _this.getColor(3) + `;">` + (row.cubes[3].length || '')) + ` </span>` : '') +
+            (row.cubes[1] ? (`<span style="color: ` + _this.getColor(1) + `;">` + (row.cubes[1].length || '')) + ` </span>` : '') +
+            (row.cubes[2] ? (`<span style="color: ` + _this.getColor(2) + `;">` + (row.cubes[2].length || '')) + ` </span>` : '') +
+            (row.cubes[3] ? (`<span style="color: ` + _this.getColor(3) + `;">` + (row.cubes[3].length || '')) + ` </span>` : '') +
           `</td>
           <td class="custom-highlighted-cell-name">${row.name}</td>
           <td>${id}</td>
@@ -614,7 +683,31 @@ var CustomHighlight = function () {
         </tr>`;
       }
     }
-    html += '</tbody></table>';
+    html += '</tbody>';
+
+    let xResults = this.db.getAll('x');
+    for (let id in xResults) {
+      if (xResults.hasOwnProperty(id)) {
+        row = xResults[id];
+        html += `<tr
+          data-cell-id="${id}"
+          data-timestamp="${row.timestamp}"
+          data-dataset-id="${row.dataset}"
+          data-type="x"
+        >
+          <td>` +
+            `<span style="color: ` + _this.getColor(4) + `;">` + (row.cubes.length || '') + ` </span>` +
+          `</td>
+          <td class="custom-highlighted-cell-name">${row.name}</td>
+          <td>${id}</td>
+          <td>${(new Date(row.timestamp)).toLocaleString()}</td>
+          <td><button class="minimalButton">Remove</button></td>
+        </tr>`;
+      }
+    }
+    html += '</tbody>';
+
+    html += '</table>';
 
     K.gid('ewsCustomHighlightedCellsWrapper').innerHTML = html;
     $('#ewsCustomHighlightedCells').dialog('open');
@@ -667,7 +760,7 @@ var CustomHighlight = function () {
 
 
   // source: https://beta.eyewire.org/static/js/omni.js
-  var controlset = ['highlight', 'unhighlight'];
+  var controlset = ['highlight', 'unhighlight', 'xhighlight', 'xunhighlight'];
   var BUTTON_DESCRIPTIONS = {
     highlight: {
       hotkey: 'v',
@@ -677,6 +770,17 @@ var CustomHighlight = function () {
     unhighlight: {
       hotkey: 'b',
       options: ['cube', 'parents', 'children'],
+      fn: _this.remove
+    },
+    // here only for the ease of using (x+x) and (z+z) shortcuts. The actual button isn't triggered by the combination
+    xhighlight: {
+      hotkey: 'x',
+      options: ['cube', 'x-highlight'],
+      fn: _this.add
+    },
+    xunhighlight: {
+      hotkey: 'z',
+      options: ['cube', 'x-highlight'],
       fn: _this.remove
     }
   };
@@ -688,7 +792,12 @@ var CustomHighlight = function () {
     var basekey = desc.hotkey;
 
     if (desc.options.indexOf('cube') !== -1) {
-      _hotkeys[basekey + basekey] = desc.fn.bind(_this);
+      if (desc.options.indexOf('x-highlight') !== -1) {
+        _hotkeys[basekey + basekey] = desc.fn.bind(_this, {}, 'x');
+      }
+      else {
+        _hotkeys[basekey + basekey] = desc.fn.bind(_this);
+      }
     }
     if (desc.options.indexOf('parents') !== -1) {
       _hotkeys[basekey + 'up'] = desc.fn.bind(_this, {parents: true});
@@ -714,6 +823,7 @@ var CustomHighlight = function () {
 
   doc.on('cube-leave-triggered.custom-highlight', function () {
     _this.refresh();
+    _this.refresh('x');
   });
 
   doc.on('model-fetched-triggered.custom-highlight', function () {
@@ -884,13 +994,37 @@ var CustomHighlight = function () {
           colorIndex: _this.currentColorIndex
         });
         _this.refresh();
+        _this.refresh('x');
       });
+    })
+    .on('click', '#cubeInspectorFloatingControls .controls .showmeme .parents', function () { // x-highlight
+      let currentCellId = _this.getCurrentCellId();
+      let cubes = _this.db.get(currentCellId, null, 'x');
+      let convertToSCHighlights = K.ls.get('settings-convert-x-highlights-to-sced-highlights') === 'true';
+
+      if (!cubes) {
+        return;
+      }
+
+      cubes.forEach(cube => {
+        $.post('/1.0/task/' + cube, {
+					action: 'complete',
+        }, 'json')
+        .done(function () {
+          _this.remove(null, 'x', cube);
+          if (convertToSCHighlights) {
+            _this.add(null, null, cube);
+          }
+        });
+      })
+
     })
     .on('contextmenu', '#cubeInspectorFloatingControls .controls .inspect .parents', function (evt) {
       evt.stopPropagation();
       evt.preventDefault();
       _this.db.deleteCell( _this.getCurrentCellId());
       _this.refresh();
+      _this.refresh('x');
     });
 
   doc
@@ -900,15 +1034,33 @@ var CustomHighlight = function () {
     .on('click', '#ewsCustomHighlightedCellsWrapper button', function () {
       var
         cellId = this.parentNode.previousElementSibling.previousElementSibling.innerHTML,
-        row = this.parentNode.parentNode;
+        row = this.parentNode.parentNode,
+        type = row.dataset.type;
 
-      _this.removeCell(parseInt(cellId, 10));
+      _this.removeCell(parseInt(cellId, 10), type);
       row.remove();
     })
     .on('ews-setting-changed', function (evt, data) {
       if (data.setting === 'settings-show-higlight-unavailable-for-sc-cubes-button') {
         K.qS('#cubeInspectorFloatingControls .controls .inspect .parents').style.display = data.state ? 'block' : 'none';
         K.qS('#cubeInspectorFloatingControls .controls .inspect .parents').title = data.state ? 'Highlight unavailable for SC cubes (right-click to remove all highlights)' : '';
+      }
+      else if (data.setting === 'settings-convert-x-highlights-to-sced-highlights') {
+        //
+      }
+      else if (data.setting === 'settings-x-highlight') {
+        if (data.state) {
+          K.qS('#cubeInspectorFloatingControls .controls .showmeme .parents').style.display = 'block';
+          K.qS('#cubeInspectorFloatingControls .controls .showmeme .parents').title = 'SC X-highlighted cubes';
+          K.gid('ews-custom-highlight-color-label-4').style.display = 'block';
+          K.gid('settings-convert-x-highlights-to-sced-highlights-wrapper').style.display = 'block';
+        }
+        else {
+          K.qS('#cubeInspectorFloatingControls .controls .showmeme .parents').style.display = 'none';
+          K.qS('#cubeInspectorFloatingControls .controls .showmeme .parents').title = '';
+          K.gid('ews-custom-highlight-color-label-4').style.display = 'none';
+          K.gid('settings-convert-x-highlights-to-sced-highlights-wrapper').style.display = 'none';
+        }
       }
     });
 
@@ -942,7 +1094,7 @@ function main() {
     K.addCSSFile('http://127.0.0.1:8887/spectrum.css');
   }
   else {
-    K.addCSSFile('https://chrisraven.github.io/EyeWire-Custom-Highlight/styles.css?v=2');
+    K.addCSSFile('https://chrisraven.github.io/EyeWire-Custom-Highlight/styles.css?v=3');
     K.addCSSFile('https://chrisraven.github.io/EyeWire-Custom-Highlight/spectrum.css?v=1');
   }
 
@@ -979,6 +1131,26 @@ function main() {
         });
 
         K.qS('#cubeInspectorFloatingControls .controls .inspect .parents').title = 'Highlight unavailable for SC cubes (right-click to remove all highlights)';
+
+        // checked = K.ls.get('settings-convert-x-highlights-to-sced-highlights') === 'true';
+        settings.addOption({
+          indented: true,
+          name: 'Convert X-highlights to SCed highlights',
+          id: 'settings-convert-x-highlights-to-sced-highlights',
+          state: checked,
+          defaultState: false
+        });
+
+        settings.addOption({
+          name: 'X Highlight',
+          id: 'settings-x-highlight',
+          defaultState: false
+        });
+
+        $('#settings-convert-x-highlights-to-sced-highlights-wrapper').insertAfter('#settings-x-highlight-wrapper');
+        $('#ews-custom-highlight-color-label-4').insertAfter('#settings-x-highlight-wrapper');
+
+        K.qS('#cubeInspectorFloatingControls .controls .showmeme .parents').title = 'SC X-highlighted cubes';
       }
 
       

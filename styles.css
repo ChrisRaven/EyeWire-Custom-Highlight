@@ -138,13 +138,15 @@
 
 #ews-custom-highlight-color-label-1,
 #ews-custom-highlight-color-label-2,
-#ews-custom-highlight-color-label-3 {
+#ews-custom-highlight-color-label-3,
+#ews-custom-highlight-color-label-4 {
     padding: 10px;
 }
 
 #ews-custom-highlight-color-1,
 #ews-custom-highlight-color-2,
-#ews-custom-highlight-color-3 {
+#ews-custom-highlight-color-3,
+#ews-custom-highlight-color-4 {
     width: 40px;
     height: 15px;
     display: inline-block;
@@ -214,4 +216,23 @@
 #cubeInspectorFloatingControls .controls .inspect .parents {
   display: none;
   background-color: #4b4971;
+}
+
+
+#cubeInspectorFloatingControls .controls .showmeme .parents {
+  display: none;
+  background-color: #bb30bb;
+}
+
+#settings-convert-x-highlights-to-sced-highlights-wrapper {
+    display: none;
+}
+
+#ews-custom-highlight-color-label-4 {
+    margin-left: 30px;
+    display: none;
+}
+
+#settings-x-highlight-wrapper {
+    display: block;
 }
