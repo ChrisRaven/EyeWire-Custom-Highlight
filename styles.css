@@ -236,3 +236,9 @@
 #settings-x-highlight-wrapper {
     display: block;
 }
+
+#x-counter {
+    bottom: 0;
+    right: 10px;
+    position: absolute;
+}

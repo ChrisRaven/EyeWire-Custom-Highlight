@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.6
+// @version      1.6.1
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -170,6 +170,8 @@ function Settings() {
 
 
 var CustomHighlight = function () {
+  let _that = this;
+
   let initialColors = ['', '#d04f4f', '#2ecc71', '#e6c760', '#0000ff'];
 
   this.currentColorIndex = +K.ls.get('custom-highlight-index') || 1;
@@ -312,6 +314,16 @@ var CustomHighlight = function () {
 
   highlightButton.classList.add('active');
 
+  this.updateXCounter = function (val) {console.log('called')
+    if (typeof val === 'undefined') {
+      val = this.db.get(tomni.getCurrentCell().info.id, null, 'x').length;
+    }
+
+    // if (K.gid('x-counter')) {
+      K.gid('x-counter').innerHTML = val;
+    // }
+  }
+
 
   this.db = {};
 
@@ -354,12 +366,14 @@ var CustomHighlight = function () {
           cubes: []
         };
         currentData[data.cellId].cubes = data.cubes;
+        _that.updateXCounter(data.cubes.length);
       }
       else {
-        cell.timestamp = Date.now(),
-        cell.name = data.name, // in case, the name was changed
+        cell.timestamp = Date.now();
+        cell.name = data.name; // in case, the name was changed
         cell.cubes.push(...data.cubes);
         cell.cubes = [...new Set(cell.cubes)];
+        _that.updateXCounter(cell.cubes.length);
       }
 
       if (highlight) {
@@ -421,6 +435,7 @@ var CustomHighlight = function () {
       }
       if (cell) {
         cell.cubes = cell.cubes.filter(x => cubes.indexOf(x) === -1);
+        _that.updateXCounter(cell.cubes.length);
         if (highlight) {
           _this.highlight(cell.cubes, 4);
         }
@@ -544,7 +559,7 @@ var CustomHighlight = function () {
     if (type && type === 'x') {
       this.db.delete(cellId, [cubeId], null, true, 'x');
       let result = this.db.getAll('x');
-      if (!result[cellId].cubes.length) {
+      if (!result[cellId] || !result[cellId].cubes || !result[cellId].cubes.length) {
         this.db.deleteCell(cellId, 'x');
       }
     }
@@ -819,6 +834,7 @@ var CustomHighlight = function () {
 
   doc.on('cell-info-ready-triggered.custom-highlight', function () {
     _this.highlightCell();
+    _that.updateXCounter();
   });
 
   doc.on('cube-leave-triggered.custom-highlight', function () {
@@ -1049,15 +1065,29 @@ var CustomHighlight = function () {
         //
       }
       else if (data.setting === 'settings-x-highlight') {
+        let xButton = K.qS('#cubeInspectorFloatingControls .controls .showmeme .parents');
         if (data.state) {
-          K.qS('#cubeInspectorFloatingControls .controls .showmeme .parents').style.display = 'block';
-          K.qS('#cubeInspectorFloatingControls .controls .showmeme .parents').title = 'SC X-highlighted cubes';
+          
+          xButton.style.display = 'block';
+          xButton.title = 'SC X-highlighted cubes';
+          let xCounter = K.gid('x-counter');
+          if (!xCounter) {
+            xCounter = document.createElement('div');
+            xCounter.id = 'x-counter';
+            xButton.appendChild(xCounter);
+          }
+          else {
+            xCounter.style.display ='block';
+          }
           K.gid('ews-custom-highlight-color-label-4').style.display = 'block';
           K.gid('settings-convert-x-highlights-to-sced-highlights-wrapper').style.display = 'block';
         }
         else {
-          K.qS('#cubeInspectorFloatingControls .controls .showmeme .parents').style.display = 'none';
-          K.qS('#cubeInspectorFloatingControls .controls .showmeme .parents').title = '';
+          xButton.style.display = 'none';
+          xButton.title = '';
+          if (K.gid('x-counter')) {
+            K.gid('x-counter').style.display = 'none';
+          }
           K.gid('ews-custom-highlight-color-label-4').style.display = 'none';
           K.gid('settings-convert-x-highlights-to-sced-highlights-wrapper').style.display = 'none';
         }
@@ -1094,7 +1124,7 @@ function main() {
     K.addCSSFile('http://127.0.0.1:8887/spectrum.css');
   }
   else {
-    K.addCSSFile('https://chrisraven.github.io/EyeWire-Custom-Highlight/styles.css?v=3');
+    K.addCSSFile('https://chrisraven.github.io/EyeWire-Custom-Highlight/styles.css?v=4');
     K.addCSSFile('https://chrisraven.github.io/EyeWire-Custom-Highlight/spectrum.css?v=1');
   }
 
