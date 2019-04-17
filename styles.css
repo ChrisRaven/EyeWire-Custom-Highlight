@@ -238,7 +238,8 @@
 }
 
 #x-counter {
-    bottom: 0;
-    right: 10px;
+    bottom: 6px;
+    margin-left: -3.5px;
     position: absolute;
+    width: 100%;
 }

@@ -1124,7 +1124,7 @@ function main() {
     K.addCSSFile('http://127.0.0.1:8887/spectrum.css');
   }
   else {
-    K.addCSSFile('https://chrisraven.github.io/EyeWire-Custom-Highlight/styles.css?v=4');
+    K.addCSSFile('https://chrisraven.github.io/EyeWire-Custom-Highlight/styles.css?v=5');
     K.addCSSFile('https://chrisraven.github.io/EyeWire-Custom-Highlight/spectrum.css?v=1');
   }
 
