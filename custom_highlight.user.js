@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.6.1.1
+// @version      1.6.2
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -1128,78 +1128,76 @@ function main() {
     K.addCSSFile('https://chrisraven.github.io/EyeWire-Custom-Highlight/spectrum.css?v=1');
   }
 
-  if (account.can('scout scythe mystic admin')) {
-    let intv = setInterval(function () {
-      if (!K.gid('cubeInspectorFloatingControls')) {
-        return;
-      }
+  let intv = setInterval(function () {
+    if (!K.gid('cubeInspectorFloatingControls')) {
+      return;
+    }
 
-      clearInterval(intv);
+    clearInterval(intv);
 
-      let settings = new Settings();
+    let settings = new Settings();
 
-      let checked = K.ls.get('settings-unhighlight-all') === 'true';
-      settings.addCategory();
+    let checked = K.ls.get('settings-unhighlight-all') === 'true';
+    settings.addCategory();
+    settings.addOption({
+      name: 'Unhighlight all colors at once',
+      id: 'settings-unhighlight-all',
+      state: checked,
+      defaultState: false
+    });
+
+    // new object must be created after the first setting, because it depends on the settings,
+    // but before the second setting, because the second setting depends on the new object
+    highlight = new CustomHighlight();
+
+    if (account.can('scythe mystic admin')) {
+      checked = K.ls.get('settings-show-higlight-unavailable-for-sc-cubes-button') === 'true';
       settings.addOption({
-        name: 'Unhighlight all colors at once',
-        id: 'settings-unhighlight-all',
+        name: 'Show "Highlight unavailable for SC cubes" button',
+        id: 'settings-show-higlight-unavailable-for-sc-cubes-button',
         state: checked,
         defaultState: false
       });
 
-      // new object must be created after the first setting, because it depends on the settings,
-      // but before the second setting, because the second setting depends on the new object
-      highlight = new CustomHighlight();
+      K.qS('#cubeInspectorFloatingControls .controls .inspect .parents').title = 'Highlight unavailable for SC cubes (right-click to remove all highlights)';
 
-      if (account.can('scythe mystic admin')) {
-        checked = K.ls.get('settings-show-higlight-unavailable-for-sc-cubes-button') === 'true';
-        settings.addOption({
-          name: 'Show "Highlight unavailable for SC cubes" button',
-          id: 'settings-show-higlight-unavailable-for-sc-cubes-button',
-          state: checked,
-          defaultState: false
-        });
+      // checked = K.ls.get('settings-convert-x-highlights-to-sced-highlights') === 'true';
+      settings.addOption({
+        indented: true,
+        name: 'Convert X-highlights to SCed highlights',
+        id: 'settings-convert-x-highlights-to-sced-highlights',
+        state: checked,
+        defaultState: false
+      });
 
-        K.qS('#cubeInspectorFloatingControls .controls .inspect .parents').title = 'Highlight unavailable for SC cubes (right-click to remove all highlights)';
+      settings.addOption({
+        name: 'X Highlight',
+        id: 'settings-x-highlight',
+        defaultState: false
+      });
 
-        // checked = K.ls.get('settings-convert-x-highlights-to-sced-highlights') === 'true';
-        settings.addOption({
-          indented: true,
-          name: 'Convert X-highlights to SCed highlights',
-          id: 'settings-convert-x-highlights-to-sced-highlights',
-          state: checked,
-          defaultState: false
-        });
+      $('#settings-convert-x-highlights-to-sced-highlights-wrapper').insertAfter('#settings-x-highlight-wrapper');
+      $('#ews-custom-highlight-color-label-4').insertAfter('#settings-x-highlight-wrapper');
 
-        settings.addOption({
-          name: 'X Highlight',
-          id: 'settings-x-highlight',
-          defaultState: false
-        });
+      K.qS('#cubeInspectorFloatingControls .controls .showmeme .parents').title = 'SC X-highlighted cubes';
+    }
 
-        $('#settings-convert-x-highlights-to-sced-highlights-wrapper').insertAfter('#settings-x-highlight-wrapper');
-        $('#ews-custom-highlight-color-label-4').insertAfter('#settings-x-highlight-wrapper');
-
-        K.qS('#cubeInspectorFloatingControls .controls .showmeme .parents').title = 'SC X-highlighted cubes';
+    
+    $(document).keyup(function (evt) {
+      if (evt.which !== 84) {
+        return;
       }
 
-      
-      $(document).keyup(function (evt) {
-        if (evt.which !== 84) {
-          return;
-        }
-
-        let index = highlight.currentColorIndex + 1;
-        if (index > 3) {
-          index = 1;
-        }
-        K.ls.set('custom-highlight-index', index);
-        highlight.currentColorIndex = index;
-        K.qS('#ews-custom-highlight-color-label-' + index + ' input').checked = true;
-        highlight.updateIndicator();
-      });
-    }, 50);
-  }
+      let index = highlight.currentColorIndex + 1;
+      if (index > 3) {
+        index = 1;
+      }
+      K.ls.set('custom-highlight-index', index);
+      highlight.currentColorIndex = index;
+      K.qS('#ews-custom-highlight-color-label-' + index + ' input').checked = true;
+      highlight.updateIndicator();
+    });
+  }, 50);
 }
 
 
