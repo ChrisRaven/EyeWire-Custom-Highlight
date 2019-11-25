@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.6.2
+// @version      1.6.2.1
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -314,7 +314,7 @@ var CustomHighlight = function () {
 
   highlightButton.classList.add('active');
 
-  this.updateXCounter = function (val) {console.log('called')
+  this.updateXCounter = function (val) {
     if (typeof val === 'undefined') {
       val = this.db.get(tomni.getCurrentCell().info.id, null, 'x').length;
     }
@@ -1032,7 +1032,7 @@ var CustomHighlight = function () {
             _this.add(null, null, cube);
           }
         });
-      })
+      });
 
     })
     .on('contextmenu', '#cubeInspectorFloatingControls .controls .inspect .parents', function (evt) {
