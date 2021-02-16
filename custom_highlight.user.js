@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Custom Highlight
 // @namespace    http://tampermonkey.net/
-// @version      1.6.2.1
+// @version      1.6.3.0
 // @description  Allows highlighting any cubes
 // @author       Krzysztof Kruk
 // @match        https://*.eyewire.org/*
@@ -501,11 +501,13 @@ var CustomHighlight = function () {
   };
 
   this.getCurrentCubeId = function () {
-    return tomni.getTarget()[0].id;
+    let target = tomni.getTarget();
+    return target && tomni.getTarget()[0].id;
   };
 
   this.getCurrentCellId = function () {
-    return tomni.getCurrentCell().id;
+    let cell = tomni.getCurrentCell();
+    return cell && tomni.getCurrentCell().id;
   };
 
   this.add = function (direction, type, cubeId) {
